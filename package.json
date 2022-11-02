@@ -1,0 +1,28 @@
+{
+  "name": "the_music_store",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server.js",
+    "start-dev": "nodemon server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcrypt": "5.0.1",
+    "cors": "2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "4.18.1",
+    "jsonwebtoken": "8.5.1",
+    "sequelize": "6.20.1",
+    "sqlite3": "5.0.8"
+  },
+  "devDependencies": {
+    "jest": "28.1.0",
+    "nodemon": "2.0.16",
+    "prettier": "^2.7.1",
+    "supertest": "6.2.3"
+  }
+}
