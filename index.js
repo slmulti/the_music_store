@@ -4,20 +4,28 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const app = express();
 const { User, CD } = require('./db');
+const bodyParser = require("body-parser")
+const { Op } = require('sequelize');
 
 const { JWT_SECRET, SALT_COUNT } = process.env;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(bodyParser.json())
+
+//home page
 
 app.get('/', async (req, res, next) => {
+  console.log("Home page loaded")
   try {
     res.send(`
       <h1>Welcome to THE MUSIC STORE!</h1>
       <p>All of our CDs are available to view here <a href="/cds">Shop</a></p>
-      <p>Cats are available at <a href="/kittens/1">/kittens/:id</a></p>
-      <p>Create a new cat at <b><code>POST /kittens</code></b> and delete one at <b><code>DELETE /kittens/:id</code></b></p>
-      <p>Log in via POST /login or register via POST /register</p>
+      <p>Or, you can view albums by their Genre <a href="/cds/genre/Rock">Rock</a> || <a href="/cds/genre/Metal">Metal</a> || <a href="/cds/genre/Pop">Pop</a> || <a href="/cds/genre/Rap">Rap</a></p>
+      <p>It is also possible to search for an album or artist in the URL bar at the top by <b>typing in queries</b>. For example:</p>
+      <p><a href="http://localhost:4000/cds/search?album=w">http://localhost:4000/cds/search?album=w</a> will show results for all albums containing a 'w' but will also work if you put the whole album name e.g <a href="http://localhost:4000/cds/search?album=wasting%light">http://localhost:4000/cds/search?album=wasting%light</a></p>
+      <p>This works with the Key Values <b>album</b>, <b>artist</b> and <b>genre</b>.</p>
+      <p>If you are the owner of this fine establihment then please log in to Create, Update and Delete here <a href="/login">Admin Login</a></p>
     `);
   } catch (error) {
     console.error(error);
@@ -29,11 +37,11 @@ app.get('/', async (req, res, next) => {
 
 app.get('/cds', async (req, res, next) => {
   const allCDs = await CD.findAll()
-  // console.log(allCDs)
+  console.log("A request for all the CDs has been made")
   res.json(allCDs)
 })
 
-// get CDs by Genre >>not working
+// get CDs by Genre
 
 app.get('/cds/genre/:genre', async (req, res, next) => {
   const findGenre = await CD.findAll({where: {genre: req.params.genre}})
@@ -41,11 +49,33 @@ app.get('/cds/genre/:genre', async (req, res, next) => {
   res.send(findGenre)
 })
 
+//get CDs by query searching
+
+app.get('/cds/search', async (req, res, next) => {
+  try {
+    console.log(req.query)
+    const where = {};
+    for(const key of ['album', 'artist', 'genre']) {
+      if(req.query[key]) {
+        where[key] =  {
+          [Op.like]: `%${req.query[key]}%`
+        };
+      }
+    }        
+    const cds = await CD.findAll({
+      where
+    });
+    res.send(cds);
+  } catch (error) {
+    next(error)
+  }
+})
+
 // get CDs by id 
 
 app.get('/cds/:id', async (req,res,next) => {
   const cd = await CD.findByPk(req.params.id)
-  console.log(cd)
+  console.log(JSON.stringify(cd))
   res.send(cd)
 })
 
@@ -60,6 +90,25 @@ app.post('/cds', async (req, res, next) => {
     next(error);
   }
 });
+
+//update cd price
+
+app.put('/cds/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { album, artist, genre, price } = req.body
+    const existingCD = await CD.findByPk(id);
+    if(!existingCD) {
+      res.status(404).send(`CD with id ${id} not found`);
+      return;
+    }
+    await CD.update({album, artist, genre, price
+    }, {where: {id}});
+    res.send(`updated CD with id ${id} (${existingCD.album} by ${existingCD.artist}) from ${existingCD.price} to ${price}`);
+  } catch (error) {
+    next(error);
+  }
+})
 
 //delete cd
 
@@ -148,7 +197,7 @@ app.get('/kittens/:id', setUser, async (req, res, next) => {
 
 // error handling middleware, so failed tests receive them
 app.use((error, req, res, next) => {
-  console.error('SERVER ERROR: ', error);
+  console.error('SERVER ERROR: ', error);      
   if (res.statusCode < 400) res.status(500);
   res.send({ error: error.message, name: error.name, message: error.message });
 });
