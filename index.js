@@ -82,6 +82,7 @@ app.get("/profile", requiresAuth(), (req, res) => {
   res.send(JSON.stringify(req.oidc.user));
 });
 
+
 // get all CDs
 
 app.get("/cds", async (req, res, next) => {
@@ -227,30 +228,6 @@ app.delete("/cds/:id", async (req, res, next) => {
 //   } catch (error) {}
 // });
 
-// GET /kittens/:id
-// TODO - takes an id and returns the cat with that id
-// app.get('/kittens/:id', setUser, async (req, res, next) => {
-//   if (!req.user) {
-//     console.log('no user');
-//     res.status(401).send('Currently not logged in.');
-//     return;
-//   }
-//   const cat = await Kitten.findByPk(req.params.id);
-//   if (req.user.id != cat.ownerId) {
-//     console.log('no match');
-//     res.status(401).send('Unauthorized user.');
-//     return;
-//   }
-
-//   const { age, color, name } = cat;
-//   res.send({ age, color, name });
-// });
-
-// POST /kittens
-// TODO - takes req.body of {name, age, color} and creates a new cat with the given name, age, and color
-
-// DELETE /kittens/:id
-// TODO - takes an id and deletes the cat with that id
 
 // error handling middleware, so failed tests receive them
 app.use((error, req, res, next) => {
