@@ -2,6 +2,8 @@ const express = require("express");
 require("dotenv").config(".env");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const { expressjwt: expressjwt } = require("express-jwt");
+const jwks = require('jwks-rsa');
 const app = express();
 const { User, CD } = require("./db");
 const bodyParser = require("body-parser");
@@ -15,6 +17,18 @@ const { requiresAuth } = require("express-openid-connect");
 const { AUTH0_SECRET, AUTH0_AUDIENCE, AUTH0_CLIENT_ID, AUTH0_BASE_URL } =
   process.env;
 
+const jwtCheck = expressjwt({
+  secret: jwks.expressJwtSecret({
+    cache: true,
+    rateLimit: true,
+    jwksRequestsPerMinute: 5,
+    jwksUri: 'https://dev-be8w11nearw7ojav.us.auth0.com/.well-known/jwks.json'
+  }),
+  audience: 'http://localhost:4000',
+  issuer: 'https://dev-be8w11nearw7ojav.us.auth0.com/',
+  algorithms: ['RS256']
+});
+
 const config = {
   authRequired: false,
   auth0Logout: true,
@@ -25,8 +39,7 @@ const config = {
 };
 
 // auth router attaches /login, /logout, and /callback routes to the baseURL
-app.use(auth(config));
-
+app.use(auth(config))
 
 
 app.use(express.json());
@@ -38,17 +51,27 @@ app.use(bodyParser.json());
 app.get("/", async (req, res, next) => {
   console.log("Home Page loaded");
   try {
-    res.send(`
-      <h1>Welcome to THE MUSIC STORE!</h1>
+    res.send(
+      req.oidc.isAuthenticated()
+        ? `<h1>Welcome to THE MUSIC STORE!</h1>
       <p>All of our CDs are available to view here <a href="/cds">Shop</a></p>
       <p>Or, you can view albums by their Genre <a href="/cds/genre/Rock">Rock</a> || <a href="/cds/genre/Metal">Metal</a> || <a href="/cds/genre/Pop">Pop</a> || <a href="/cds/genre/Rap">Rap</a></p>
       <p>It is also possible to search for an album or artist in the URL bar at the top by <b>typing in queries</b>. For example:</p>
       <p><a href="http://localhost:4000/cds/search?album=w">http://localhost:4000/cds/search?album=w</a> will show results for all albums containing a 'w' but will also work if you put the whole album name e.g <a href="http://localhost:4000/cds/search?album=wasting%light">http://localhost:4000/cds/search?album=wasting%light</a></p>
       <p>This works with the Key Values <b>album</b>, <b>artist</b> and <b>genre</b>.</p>
-      <p>If you are the owner of this fine establihment then please log in to Create, Update and Delete here <a href="/login">Admin Login</a>.</p>
+      <p>If you are the owner of this fine establishment then please log in to Create, Update and Delete here <a href="/login">Admin Login</a>.</p>
       <p>...or if you have just starting working for us <a href="/sign-up">Register Here</a>.</p>
-      <p><a href="/logout">Logout</a> || <a href="/staff%zone">Staff Zone</a></p>
-    `);
+      <p><a href="/logout">Logout</a> || <a href="/staff%zone">Staff Zone</a></p>`
+        : `<h1>Welcome to THE MUSIC STORE!</h1>
+      <p>All of our CDs are available to view here <a href="/cds">Shop</a></p>
+      <p>Or, you can view albums by their Genre <a href="/cds/genre/Rock">Rock</a> || <a href="/cds/genre/Metal">Metal</a> || <a href="/cds/genre/Pop">Pop</a> || <a href="/cds/genre/Rap">Rap</a></p>
+      <p>It is also possible to search for an album or artist in the URL bar at the top by <b>typing in queries</b>. For example:</p>
+      <p><a href="http://localhost:4000/cds/search?album=w">http://localhost:4000/cds/search?album=w</a> will show results for all albums containing a 'w' but will also work if you put the whole album name e.g <a href="http://localhost:4000/cds/search?album=wasting%light">http://localhost:4000/cds/search?album=wasting%light</a></p>
+      <p>This works with the Key Values <b>album</b>, <b>artist</b> and <b>genre</b>.</p>
+      <p>If you are the owner of this fine establishment then please log in to Create, Update and Delete here <a href="/login">Admin Login</a>.</p>
+      <p>...or if you have just starting working for us <a href="/sign-up">Register Here</a>.</p>
+      <p><a href="/login">Login</a> || <a href="/staff%zone">Staff Zone</a></p>`
+    )
   } catch (error) {
     console.error(error);
     next(error);
@@ -63,7 +86,7 @@ app.get("/sign-up", (req, res) => {
   });
 });
 
-app.get("/staff%zone", (req, res) => {
+app.get("/staff%zone", (req, res, next) => {
   console.log("Staff Zone loaded");
   try {
     res.send(
@@ -129,9 +152,15 @@ app.get("/cds/:id", async (req, res, next) => {
   res.send(cd);
 });
 
+//==========================================
+//admin
+//==========================================
+
+app.use(jwtCheck);
+
 //create cd
 
-app.post("/cds", async (req, res, next) => {
+app.post("/cds", jwtCheck, async (req, res, next) => {
   try {
     const { album, artist, genre, price } = req.body;
     const cd = await CD.create({ album, artist, genre, price });
@@ -143,7 +172,7 @@ app.post("/cds", async (req, res, next) => {
 
 //update cd price
 
-app.put("/cds/:id", async (req, res, next) => {
+app.put("/cds/:id", jwtCheck, async (req, res, next) => {
   try {
     const { id } = req.params;
     const { album, artist, genre, price } = req.body;
@@ -171,7 +200,7 @@ app.put("/cds/:id", async (req, res, next) => {
 
 //delete cd
 
-app.delete("/cds/:id", async (req, res, next) => {
+app.delete("/cds/:id", jwtCheck, async (req, res, next) => {
   try {
     const { id } = req.params;
     const existingCD = await CD.findByPk(id);
@@ -188,45 +217,6 @@ app.delete("/cds/:id", async (req, res, next) => {
 
 //===================================================================================================================
 //===================================================================================================================
-
-// Verifies token with jwt.verify and sets req.user
-// TODO - Create authentication middleware
-// const setUser = (req, res, next) => {
-//   const auth = req.header('Authorization');
-//   if (!auth) {
-//     next();
-//     return;
-//   }
-//   const [_, token] = auth.split(' ');
-//   try {
-//     const user = jwt.verify(token, JWT_SECRET);
-//     req.user = user;
-//     next();
-//   } catch (error) {
-//     console.log(error.message);
-//     next();
-//   }
-// };
-
-// POST /register
-// OPTIONAL - takes req.body of {username, password} and creates a new user with the hashed password
-
-// POST /login
-// OPTIONAL - takes req.body of {username, password}, finds user by username, and compares the password with the hashed version from the DB
-// app.post('/login', async (req, res, next) => {
-//   try {
-//     const { username, password } = req.body;
-//     const user = await User.findOne({ where: { username } });
-//     const isMatch = await bcrypt.compare(password, user.password);
-//     if (isMatch) {
-//       const { id, username } = user;
-//       const token = jwt.sign({ id, username }, JWT_SECRET);
-//       res.send({ message: 'Login Successful', token });
-//       return;
-//     }
-//     res.sendStatus(401);
-//   } catch (error) {}
-// });
 
 
 // error handling middleware, so failed tests receive them
